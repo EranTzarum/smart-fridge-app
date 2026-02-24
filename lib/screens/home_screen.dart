@@ -4,8 +4,40 @@ import '../services/auth_service.dart';
 import 'auth_screen.dart';
 import 'inventory_screen.dart';
 
+// ── Card data model ───────────────────────────────────────────────────────────
+
+class _CardData {
+  const _CardData({
+    required this.title,
+    required this.subtitle,
+    required this.imageUrl,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final String imageUrl;
+  final VoidCallback onTap;
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  // Unsplash photos — high-res, freely usable placeholders.
+  static const _fridgeImg =
+      'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30'
+      '?w=800&auto=format&fit=crop&q=80';
+  static const _shoppingImg =
+      'https://images.unsplash.com/photo-1542838132-92c53300491e'
+      '?w=800&auto=format&fit=crop&q=80';
+  static const _recipesImg =
+      'https://images.unsplash.com/photo-1490645935967-10de6ba17061'
+      '?w=800&auto=format&fit=crop&q=80';
+  static const _cookingImg =
+      'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136'
+      '?w=800&auto=format&fit=crop&q=80';
 
   Future<void> _signOut(BuildContext context) async {
     await AuthService().signOut();
@@ -17,150 +49,17 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0F14),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader(context)),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _DashboardCard(
-                    title: 'MY FRIDGE',
-                    subtitle: 'Track & manage your inventory',
-                    icon: Icons.kitchen_rounded,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF003D2E), Color(0xFF00C896)],
-                    ),
-                    accentColor: const Color(0xFF00C896),
-                    onTap: () => Navigator.of(context).push(
-                      _smoothRoute(const InventoryScreen()),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _DashboardCard(
-                    title: 'MY SHOPPING LIST',
-                    subtitle: 'Plan your next grocery run',
-                    icon: Icons.shopping_cart_rounded,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF1A1400), Color(0xFFFFB830)],
-                    ),
-                    accentColor: const Color(0xFFFFB830),
-                    onTap: () => _showComingSoon(context, 'Shopping List'),
-                  ),
-                  const SizedBox(height: 16),
-                  _DashboardCard(
-                    title: 'RECIPES',
-                    subtitle: 'Discover meals from what you have',
-                    icon: Icons.menu_book_rounded,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF1A0A1E), Color(0xFFB06EF5)],
-                    ),
-                    accentColor: const Color(0xFFB06EF5),
-                    onTap: () => _showComingSoon(context, 'Recipes'),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSignOutButton(context),
-                ]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 28, 20, 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome Back',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF00C896).withOpacity(0.9),
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Smart Fridge',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.1,
-                    letterSpacing: -0.8,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'What would you like to do today?',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.45),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _ProfileButton(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSignOutButton(BuildContext context) {
-    return Center(
-      child: TextButton.icon(
-        onPressed: () => _signOut(context),
-        icon: Icon(
-          Icons.logout_rounded,
-          size: 16,
-          color: Colors.white.withOpacity(0.35),
-        ),
-        label: Text(
-          'Sign Out',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.white.withOpacity(0.35),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        ),
-      ),
-    );
-  }
-
   void _showComingSoon(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$feature — coming soon!'),
-        backgroundColor: const Color(0xFF1A1D27),
+        content: Text(
+          '$feature — coming soon!',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF2C2C2E),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       ),
     );
   }
@@ -182,31 +81,158 @@ class HomeScreen extends StatelessWidget {
           ),
         );
       },
-      transitionDuration: const Duration(milliseconds: 320),
+      transitionDuration: const Duration(milliseconds: 300),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      _CardData(
+        title: 'MY FRIDGE',
+        subtitle: 'Track & manage your inventory',
+        imageUrl: _fridgeImg,
+        onTap: () => Navigator.of(context).push(
+          _smoothRoute(const InventoryScreen()),
+        ),
+      ),
+      _CardData(
+        title: 'MY SHOPPING LIST',
+        subtitle: 'Plan your next grocery run',
+        imageUrl: _shoppingImg,
+        onTap: () => _showComingSoon(context, 'Shopping List'),
+      ),
+      _CardData(
+        title: 'RECIPES',
+        subtitle: 'Discover meals from what you have',
+        imageUrl: _recipesImg,
+        onTap: () => _showComingSoon(context, 'Recipes'),
+      ),
+      _CardData(
+        title: 'COOKING',
+        subtitle: 'Step-by-step guided cooking',
+        imageUrl: _cookingImg,
+        onTap: () => _showComingSoon(context, 'Cooking'),
+      ),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF212121),
+      body: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            _Header(onSignOut: () => _signOut(context)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              child: Column(
+                children: [
+                  for (final card in cards) ...[
+                    _DashboardCard(data: card),
+                    const SizedBox(height: 14),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-// ── Profile button ────────────────────────────────────────────────────────────
+// ── Header ────────────────────────────────────────────────────────────────────
 
-class _ProfileButton extends StatelessWidget {
+class _Header extends StatelessWidget {
+  const _Header({required this.onSignOut});
+
+  final VoidCallback onSignOut;
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1D27),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
-        ),
-        child: Icon(
-          Icons.person_rounded,
-          color: Colors.white.withOpacity(0.6),
-          size: 22,
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 28, 16, 22),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'WELCOME BACK',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withOpacity(0.45),
+                    letterSpacing: 2.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Smart Fridge',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Profile / settings icon
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'signout') onSignOut();
+            },
+            color: const Color(0xFF2C2C2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            offset: const Offset(0, 52),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'signout',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.logout_rounded,
+                      size: 18,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Sign Out',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2C2C2E),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.08),
+                ),
+              ),
+              child: Icon(
+                Icons.person_rounded,
+                color: Colors.white.withOpacity(0.7),
+                size: 22,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -215,21 +241,9 @@ class _ProfileButton extends StatelessWidget {
 // ── Dashboard card ────────────────────────────────────────────────────────────
 
 class _DashboardCard extends StatefulWidget {
-  const _DashboardCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-    required this.accentColor,
-    required this.onTap,
-  });
+  const _DashboardCard({required this.data});
 
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final LinearGradient gradient;
-  final Color accentColor;
-  final VoidCallback onTap;
+  final _CardData data;
 
   @override
   State<_DashboardCard> createState() => _DashboardCardState();
@@ -237,164 +251,146 @@ class _DashboardCard extends StatefulWidget {
 
 class _DashboardCardState extends State<_DashboardCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+  late final AnimationController _ctrl;
   late final Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 110),
       lowerBound: 0.0,
       upperBound: 1.0,
     );
-    _scale = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _scale = Tween<double>(begin: 1.0, end: 0.965).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
+      onTapDown: (_) => _ctrl.forward(),
       onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
+        _ctrl.reverse();
+        widget.data.onTap();
       },
-      onTapCancel: () => _controller.reverse(),
+      onTapCancel: () => _ctrl.reverse(),
       child: AnimatedBuilder(
         animation: _scale,
-        builder: (_, child) => Transform.scale(
-          scale: _scale.value,
-          child: child,
-        ),
-        child: Container(
-          height: 148,
-          decoration: BoxDecoration(
-            gradient: widget.gradient,
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: widget.accentColor.withOpacity(0.18),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Stack(
-              children: [
-                // Subtle decorative circle in the background
-                Positioned(
-                  right: -28,
-                  top: -28,
-                  child: Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: widget.accentColor.withOpacity(0.1),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 20,
-                  bottom: -20,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: widget.accentColor.withOpacity(0.07),
-                    ),
-                  ),
-                ),
-                // Card content
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 22,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Icon chip
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: widget.accentColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          widget.icon,
-                          color: widget.accentColor,
-                          size: 22,
-                        ),
-                      ),
-                      // Text + arrow row
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.title,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    letterSpacing: 0.6,
-                                    height: 1.1,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  widget.subtitle,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withOpacity(0.55),
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: widget.accentColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              color: widget.accentColor,
-                              size: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+        builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
+        child: _buildCard(),
+      ),
+    );
+  }
+
+  Widget _buildCard() {
+    return SizedBox(
+      height: 160,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── Background photo ──────────────────────────────────────────
+            Image.network(
+              widget.data.imageUrl,
+              fit: BoxFit.cover,
+              // Skeleton while loading
+              loadingBuilder: (_, child, progress) {
+                if (progress == null) return child;
+                return Container(color: const Color(0xFF2C2C2E));
+              },
+              errorBuilder: (_, __, ___) =>
+                  Container(color: const Color(0xFF2C2C2E)),
             ),
-          ),
+
+            // ── Dark gradient overlay for legibility ──────────────────────
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.20),
+                    Colors.black.withOpacity(0.72),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Solid tint so even bright images stay readable ────────────
+            ColoredBox(color: Colors.black.withOpacity(0.18)),
+
+            // ── Text content (bottom-left) ────────────────────────────────
+            Positioned(
+              left: 20,
+              right: 56,
+              bottom: 20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.data.title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.4,
+                      height: 1.1,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black54,
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.data.subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withOpacity(0.72),
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Arrow indicator (bottom-right) ────────────────────────────
+            Positioned(
+              right: 18,
+              bottom: 18,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.25),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
