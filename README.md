@@ -1,21 +1,24 @@
 # Smart Fridge App
 
-A Flutter mobile application for managing your fridge inventory in real time. Track what's inside, monitor expiry dates, manage your shopping list, and plan grocery runs — all backed by a multi-tenant Supabase backend with per-user data isolation.
+A Flutter mobile application for managing your fridge inventory and shopping list in real time. Track what's inside, monitor expiry dates, manage your grocery runs, and check off purchases — all backed by a multi-tenant Supabase backend with per-user data isolation.
 
 ---
 
 ## What's New
 
+### Smart Shopping List
+A fully functional shopping list screen (`shopping_list_screen.dart`) has been built and wired into the main dashboard. Items are fetched from the `smart_shopping_list` Supabase table, filtered by `user_id`, and displayed grouped by category. The screen supports manual item entry via a FAB, a Google Keep-style check-off system with undo, and permanent deletion via a trash icon.
+
 ### Multi-Tenant Infrastructure
-All database queries against `fridge_items` and `smart_shopping_list` are now filtered by the authenticated `user_id`. Each user sees only their own data — enforced both at the query level in the service layer and at the database level via Supabase Row Level Security (RLS) policies.
+All database queries against `fridge_items` and `smart_shopping_list` are filtered by the authenticated `user_id`. Each user sees only their own data — enforced both at the query level in the service layer and at the database level via Supabase Row Level Security (RLS) policies.
 
 ### Dashboard UI
-The main dashboard has been rebuilt as a dark-themed, prototype-accurate screen with animated gradient navigation cards, a profile button, and smooth fade+slide page transitions to all child routes.
+The main dashboard is a dark-themed, prototype-accurate screen with animated gradient navigation cards, a profile button, and smooth fade+slide page transitions to all child routes.
 
-### Manual CRUD Controls
-The inventory screen now supports full item lifecycle management:
+### Manual CRUD Controls (Inventory)
+The inventory screen supports full item lifecycle management:
 - **Add items** via a bottom sheet form with name, quantity, and category fields.
-- **Category-aware expiry calculation** — selecting a category (e.g. Meat, Dairy, Produce) automatically computes the default expiry date:
+- **Category-aware expiry calculation** — selecting a category automatically computes the default expiry date:
 
   | Category | Default shelf life |
   |---|---|
@@ -25,34 +28,50 @@ The inventory screen now supports full item lifecycle management:
   | Beverages | 30 days |
   | Other | 30 days |
 
-- **Swipe-to-delete** via Flutter's `Dismissible` widget — items are removed instantly from local state for a snappy UI, then deleted from Supabase in the background.
+- **Swipe-to-delete** via Flutter's `Dismissible` widget — items are removed instantly from local state, then deleted from Supabase in the background.
 
 ### Graceful Degradation
-Fixed a crash caused by Supabase Realtime timeout exceptions on slow or dropped connections. The fix decouples the initial data load (a one-shot `Future` fetch) from the live `Stream`. The inventory list is populated immediately from the fetch result; the stream overlays updates only when the socket is healthy. The UI stays populated even if the live connection never establishes.
+Fixed a crash caused by Supabase Realtime timeout exceptions on slow or dropped connections. The fix decouples the initial data load (a one-shot `Future` fetch) from the live `Stream`. The list is populated immediately from the fetch; the stream overlays updates only when the socket is healthy. The UI stays populated even if the live connection never establishes.
 
 ---
 
 ## Features
 
 ### Implemented
+
+#### Authentication & Session
 - **Authentication** — Email/password sign-up and sign-in via Supabase Auth, with email confirmation flow and inline form validation
 - **Session persistence** — Active session is checked at launch; authenticated users are routed directly to the dashboard
+- **Sign out** — Clears the Supabase session and returns to the auth screen
+
+#### Infrastructure
 - **Multi-tenant data isolation** — All queries are scoped to the authenticated `user_id`; enforced by both service-layer filters and database RLS policies
-- **Dashboard** — Dark-themed home screen with animated, gradient navigation cards and smooth page transitions
-- **Fridge Inventory** — Real-time inventory screen backed by a decoupled fetch + Supabase stream; items sorted by nearest expiry date first
+- **Graceful Realtime degradation** — Decoupled `Future` seed fetch ensures the UI is never blank due to a dropped WebSocket connection
+
+#### Dashboard
+- **Dashboard** — Dark-themed home screen with animated gradient navigation cards, a profile button, and smooth fade+slide page transitions
+
+#### Fridge Inventory
+- **Real-time inventory** — Backed by a decoupled fetch + Supabase stream; items sorted by nearest expiry date first
 - **Add items** — Bottom sheet form with category selection and automatic expiry date calculation
 - **Swipe-to-delete** — `Dismissible`-based deletion with instant local state update and async Supabase sync
+- **Pull-to-refresh** — Forces a one-shot server round-trip to confirm data is current
 - **Expiry badges** — Color-coded freshness indicators per item:
   - `Fresh` (green) — more than 7 days remaining
   - `Warning` (amber) — within 7 days
   - `Critical` (red) — within 3 days
   - `Expired` (red) — past expiry date
   - `No date` (grey) — no expiry tracked
-- **Pull-to-refresh** — Forces a one-shot server round-trip to confirm data is current
-- **Sign out** — Clears the Supabase session and returns to the auth screen
+
+#### Smart Shopping List
+- **Category-grouped list** — Items fetched from Supabase and displayed in collapsible sections by category
+- **Keep-style check-off** — Tapping an item applies a strikethrough and updates its `status` to `"bought"` in the database; the item stays visible rather than disappearing immediately
+- **5-second Undo** — A floating `SnackBar` action lets the user reverse a check-off before it is committed, restoring the item to `"pending"` both locally and in the database
+- **Permanent delete** — A trash icon button triggers hard deletion from the database; separate from the check-off flow to prevent accidental data loss
+- **Add items via FAB** — Floating Action Button opens an entry form with name, quantity, and category selection
+- **User-scoped data** — All queries include `.eq('user_id', currentUserId)` in addition to RLS enforcement
 
 ### Coming Soon
-- Shopping List (table + service scaffolded)
 - Recipe suggestions from current inventory
 
 ---
@@ -74,16 +93,17 @@ Fixed a crash caused by Supabase Realtime timeout exceptions on slow or dropped 
 
 ```
 lib/
-├── main.dart                    # App entry point, Supabase init, theme, session routing
+├── main.dart                        # App entry point, Supabase init, theme, session routing
 ├── models/
-│   └── fridge_item.dart         # FridgeItem data model, ExpiryStatus enum, daysUntilExpiry
+│   └── fridge_item.dart             # FridgeItem data model, ExpiryStatus enum, daysUntilExpiry
 ├── screens/
-│   ├── auth_screen.dart         # Login / sign-up with fade animation and form validation
-│   ├── home_screen.dart         # Dashboard: animated gradient cards, profile button
-│   └── inventory_screen.dart    # CRUD inventory: add form, swipe-delete, expiry badges
+│   ├── auth_screen.dart             # Login / sign-up with fade animation and form validation
+│   ├── home_screen.dart             # Dashboard: animated gradient cards, profile button
+│   ├── inventory_screen.dart        # Fridge CRUD: add form, swipe-delete, expiry badges
+│   └── shopping_list_screen.dart    # Shopping list: category groups, check-off, undo, FAB add
 └── services/
-    ├── auth_service.dart        # Thin wrapper around Supabase Auth
-    └── fridge_service.dart      # user_id-scoped queries, decoupled fetch + stream
+    ├── auth_service.dart            # Thin wrapper around Supabase Auth
+    └── fridge_service.dart          # user_id-scoped queries, decoupled fetch + stream
 ```
 
 ---
@@ -102,10 +122,20 @@ The `InventoryScreen` uses a two-phase data strategy to handle unreliable Realti
 ### Category-Based Expiry
 When a user adds an item and selects a category, `FridgeService.defaultExpiryForCategory()` returns a `DateTime` offset from today. This value pre-fills the expiry date field and can be overridden manually.
 
-### Swipe-to-Delete Flow
+### Swipe-to-Delete Flow (Inventory)
 1. `Dismissible.onDismissed` fires — item is removed from local `List<FridgeItem>` state immediately via `setState`.
 2. `FridgeService.deleteItem(id)` runs asynchronously in the background.
 3. If the Supabase call fails, an error snackbar is shown and the item is re-inserted at its original index.
+
+### Shopping List Check-Off & Undo Flow
+The shopping list intentionally avoids instant deletion to prevent accidental data loss. The flow follows a non-destructive, Google Keep-style pattern:
+
+1. **Check off** — User taps an item; the local model flips `isChecked = true` and the row is rendered with a strikethrough. A `PATCH` sets `status = 'bought'` in Supabase.
+2. **Undo window** — A floating `SnackBar` with a 5-second timer and an **Undo** action is shown. If tapped, `isChecked` is reverted locally and `status` is patched back to `'pending'`.
+3. **Permanent delete** — Tapping the trash icon on any item (checked or not) triggers a hard `DELETE` in Supabase and removes the item from local state. This action has no undo.
+
+### Category Grouping (Shopping List)
+Items returned from Supabase are grouped client-side by their `category` field using a `Map<String, List<ShoppingItem>>`. Each group is rendered as a labelled section header followed by its items. This requires no additional database queries — grouping is a pure in-memory transform on the fetched list.
 
 ---
 
@@ -132,8 +162,10 @@ When a user adds an item and selects a category, `FridgeService.defaultExpiryFor
 | `id` | `uuid` | Primary key, default `gen_random_uuid()` |
 | `user_id` | `uuid` | References `auth.users(id)` — required for RLS |
 | `item_name` | `text` | |
-| `quantity` | `text` | |
-| `is_checked` | `bool` | Default `false` |
+| `quantity` | `text` | e.g. `"1 litre"`, `"x3"` |
+| `category` | `text` | Used for client-side grouping, e.g. `"Dairy"`, `"Produce"` |
+| `status` | `text` | `"pending"` (default) or `"bought"` |
+| `is_checked` | `bool` | Default `false` — mirrors `status` for UI toggle state |
 
 ### Row Level Security
 
@@ -200,9 +232,16 @@ HomeScreen
   ├── MY FRIDGE        ──▶ InventoryScreen
   │                          ├── Seed fetch (Future) ──▶ populate list
   │                          ├── Live stream (Socket) ──▶ overlay updates
-  │                          ├── Add item (bottom sheet + category expiry)
-  │                          └── Swipe left to delete (local + Supabase)
-  ├── MY SHOPPING LIST ──▶ Coming soon
+  │                          ├── FAB / bottom sheet  ──▶ add item (category + auto-expiry)
+  │                          └── Swipe left          ──▶ delete (local + Supabase)
+  │
+  ├── MY SHOPPING LIST ──▶ ShoppingListScreen
+  │                          ├── Fetch (user_id filter) ──▶ group by category
+  │                          ├── Tap item    ──▶ strikethrough + status = 'bought'
+  │                          │                    └── 5s SnackBar ──▶ Undo (status = 'pending')
+  │                          ├── Trash icon  ──▶ hard DELETE (no undo)
+  │                          └── FAB         ──▶ add item (name, quantity, category)
+  │
   ├── RECIPES          ──▶ Coming soon
   └── Sign Out         ──▶ AuthScreen
 ```

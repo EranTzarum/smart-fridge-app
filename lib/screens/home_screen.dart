@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'auth_screen.dart';
 import 'inventory_screen.dart';
+import 'shopping_list_screen.dart';
 
 // ── Card data model ───────────────────────────────────────────────────────────
 
@@ -100,7 +101,9 @@ class HomeScreen extends StatelessWidget {
         title: 'MY SHOPPING LIST',
         subtitle: 'Plan your next grocery run',
         imageUrl: _shoppingImg,
-        onTap: () => _showComingSoon(context, 'Shopping List'),
+        onTap: () => Navigator.of(context).push(
+          _smoothRoute(const ShoppingListScreen()),
+        ),
       ),
       _CardData(
         title: 'RECIPES',
