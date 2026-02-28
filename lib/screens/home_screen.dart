@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'auth_screen.dart';
 import 'inventory_screen.dart';
+import 'recipes_screen.dart';
 import 'shopping_list_screen.dart';
 
 // ── Card data model ───────────────────────────────────────────────────────────
@@ -109,7 +110,9 @@ class HomeScreen extends StatelessWidget {
         title: 'RECIPES',
         subtitle: 'Discover meals from what you have',
         imageUrl: _recipesImg,
-        onTap: () => _showComingSoon(context, 'Recipes'),
+        onTap: () => Navigator.of(context).push(
+          _smoothRoute(const RecipesScreen()),
+        ),
       ),
       _CardData(
         title: 'COOKING',
