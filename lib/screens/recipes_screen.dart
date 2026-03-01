@@ -36,10 +36,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
 
   // ── State ─────────────────────────────────────────────────────────────────
 
-  int     _guestCount     = 1;
-  bool    _isLoading      = false;
-  String  _loadingMessage = '';
-  String? _currentRecipe;
+  int                      _guestCount     = 1;
+  bool                     _isLoading      = false;
+  String                   _loadingMessage = '';
+  Map<String, dynamic>?    _currentRecipe;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -60,19 +60,24 @@ class _RecipesScreenState extends State<RecipesScreen> {
 
   // ── JSON helpers ──────────────────────────────────────────────────────────
 
-  /// Safely converts the `recipe` value from an API response body into a
-  /// display-ready String, regardless of whether the backend returns a plain
-  /// String or a structured Map/List.
+  /// Normalises the `recipe` value from an API response into a
+  /// [Map<String, dynamic>] regardless of whether the backend returns a
+  /// ready-made Map or an inner JSON string.
   ///
-  /// • String  → returned as-is.
-  /// • Map/List → pretty-printed with 2-space indentation via [JsonEncoder].
-  /// • null / other → falls back to the raw response body string.
-  String _recipeToString(dynamic value, String rawBody) {
-    if (value is String) return value;
-    if (value != null) {
-      return const JsonEncoder.withIndent('  ').convert(value);
+  /// • Map<String, dynamic> → returned as-is.
+  /// • String               → decoded as JSON; if that fails the string is
+  ///                          wrapped in `{'raw': value}` for safe display.
+  /// • null / other         → wraps the raw body string in `{'raw': ...}`.
+  Map<String, dynamic> _normaliseRecipe(dynamic value, String rawBody) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is String) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is Map<String, dynamic>) return decoded;
+      } catch (_) {}
+      return {'raw': value};
     }
-    return rawBody;
+    return {'raw': rawBody};
   }
 
   // ── API calls ─────────────────────────────────────────────────────────────
@@ -106,7 +111,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
         setState(() {
-          _currentRecipe = _recipeToString(body['recipe'], res.body);
+          _currentRecipe = _normaliseRecipe(body['recipe'], res.body);
           _isLoading     = false;
         });
       } else {
@@ -143,7 +148,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
         _feedbackCtrl.clear();
         setState(() {
-          _currentRecipe = _recipeToString(body['recipe'], res.body);
+          _currentRecipe = _normaliseRecipe(body['recipe'], res.body);
           _isLoading     = false;
         });
         // Scroll back to the top of the revised recipe.
@@ -475,36 +480,73 @@ class _RecipesScreenState extends State<RecipesScreen> {
   // ── Recipe view ───────────────────────────────────────────────────────────
 
   Widget _buildRecipeView() {
+    final recipe = _currentRecipe!;
+
     return Column(
       key: const ValueKey('recipe'),
       children: [
-        // ── Scrollable recipe card ────────────────────────────────────────
+        // ── Scrollable structured recipe ──────────────────────────────────
         Expanded(
-          child: SingleChildScrollView(
-            controller: _recipeScrollCtrl,
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _kCard,
-                borderRadius: BorderRadius.circular(16),
-                border:
-                    Border.all(color: Colors.white.withOpacity(0.07)),
-              ),
-              child: SelectableText(
-                _currentRecipe!,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  color: Colors.white,
-                  height: 1.7,
-                  letterSpacing: 0.1,
-                ),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: SingleChildScrollView(
+              controller: _recipeScrollCtrl,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Fallback: raw text if the map only has a 'raw' key
+                  if (recipe.containsKey('raw') &&
+                      recipe.length == 1) ...[
+                    _RawRecipeFallback(text: recipe['raw'].toString()),
+                  ] else ...[
+                    // Chef message banner
+                    if (_str(recipe['chef_message']) case final msg
+                        when msg.isNotEmpty)
+                      _ChefMessageBanner(message: msg),
+
+                    // Title + tagline
+                    _RecipeHeader(
+                      name: _str(recipe['recipe_name']),
+                      tagline: _str(recipe['tagline']),
+                      cookingTime: _str(recipe['cooking_time'] ??
+                          recipe['prep_time']),
+                      difficulty: _str(recipe['difficulty']),
+                      servings: recipe['servings'],
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Ingredients
+                    if (recipe['used_fridge_items'] != null)
+                      _IngredientsSection(
+                          items: recipe['used_fridge_items']),
+
+                    // Missing items (need to buy)
+                    if (recipe['missing_items'] != null &&
+                        (recipe['missing_items'] as List).isNotEmpty)
+                      _MissingItemsSection(
+                          items: recipe['missing_items']),
+
+                    // Instructions
+                    if (recipe['instructions'] != null)
+                      _InstructionsSection(
+                          steps: recipe['instructions']),
+
+                    // Notes / tips
+                    if (_str(recipe['notes'] ?? recipe['tips']) case
+                        final notes when notes.isNotEmpty)
+                      _NotesSection(text: notes),
+                  ],
+
+                  const SizedBox(height: 8),
+                ],
               ),
             ),
           ),
         ),
 
-        // ── Bottom action bar ─────────────────────────────────────────────
+        // ── Bottom action bar (LTR — UI chrome stays left-to-right) ──────
         Container(
           decoration: BoxDecoration(
             color: _kBg,
@@ -518,7 +560,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Revise row: text field + send button
+                // Ask the chef row
                 Row(
                   children: [
                     Expanded(
@@ -593,6 +635,11 @@ class _RecipesScreenState extends State<RecipesScreen> {
       ],
     );
   }
+
+  // ── Utility ───────────────────────────────────────────────────────────────
+
+  /// Safely coerces a dynamic value to a non-null trimmed String.
+  static String _str(dynamic v) => v?.toString().trim() ?? '';
 
   // ── Shared input decoration ────────────────────────────────────────────────
 
@@ -709,6 +756,559 @@ class _StepButton extends StatelessWidget {
             size: 18,
             color: _kAccent.withOpacity(enabled ? 1.0 : 0.3),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Recipe display widgets (RTL Hebrew)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Shared styling helpers ────────────────────────────────────────────────────
+
+/// Bold section header with a coloured left (RTL: right) accent bar.
+class _RecipeSectionHeader extends StatelessWidget {
+  const _RecipeSectionHeader({
+    required this.title,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 20,
+            margin: const EdgeInsets.only(left: 10),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Thin full-width divider used between sections.
+class _RecipeDivider extends StatelessWidget {
+  const _RecipeDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Divider(
+        color: Colors.white.withOpacity(0.08),
+        thickness: 1,
+        height: 1,
+      ),
+    );
+  }
+}
+
+// ── Chef message banner ───────────────────────────────────────────────────────
+
+class _ChefMessageBanner extends StatelessWidget {
+  const _ChefMessageBanner({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        // Warm amber tint — friendly chef personality
+        color: const Color(0xFFFFB830).withOpacity(0.09),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: const Color(0xFFFFB830).withOpacity(0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('👨‍🍳', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: Colors.white.withOpacity(0.85),
+                height: 1.6,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Recipe header (name + tagline + metadata chips) ───────────────────────────
+
+class _RecipeHeader extends StatelessWidget {
+  const _RecipeHeader({
+    required this.name,
+    required this.tagline,
+    required this.cookingTime,
+    required this.difficulty,
+    required this.servings,
+  });
+
+  final String name;
+  final String tagline;
+  final String cookingTime;
+  final String difficulty;
+  final dynamic servings;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <({String label, IconData icon})>[
+      if (cookingTime.isNotEmpty)
+        (label: cookingTime, icon: Icons.timer_outlined),
+      if (difficulty.isNotEmpty)
+        (label: difficulty, icon: Icons.bar_chart_rounded),
+      if (servings != null && servings.toString().isNotEmpty)
+        (label: '${servings} מנות', icon: Icons.people_outline_rounded),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Recipe name
+        if (name.isNotEmpty)
+          Text(
+            name,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              height: 1.2,
+              letterSpacing: -0.5,
+            ),
+          ),
+
+        // Tagline
+        if (tagline.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            tagline,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.5),
+              height: 1.45,
+            ),
+          ),
+        ],
+
+        // Metadata chips
+        if (chips.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: chips
+                .map((c) => _MetaChip(label: c.label, icon: c.icon))
+                .toList(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.label, required this.icon});
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white.withOpacity(0.5)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withOpacity(0.65),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Ingredients section ───────────────────────────────────────────────────────
+
+class _IngredientsSection extends StatelessWidget {
+  const _IngredientsSection({required this.items});
+  final dynamic items;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = items is List ? items as List : [];
+    if (list.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _RecipeDivider(),
+        const _RecipeSectionHeader(
+          title: 'מצרכים',
+          icon: Icons.kitchen_rounded,
+          color: Color(0xFF81C784),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: _kCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.07)),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < list.length; i++) ...[
+                _IngredientRow(item: list[i], index: i),
+                if (i < list.length - 1)
+                  Divider(
+                    height: 1,
+                    color: Colors.white.withOpacity(0.06),
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IngredientRow extends StatelessWidget {
+  const _IngredientRow({required this.item, required this.index});
+  final dynamic item;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    // Support both plain strings and {item_name, quantity} maps.
+    final String name;
+    final String quantity;
+
+    if (item is Map) {
+      name = (item['item_name'] ?? item['name'] ?? item['ingredient'] ?? '')
+          .toString()
+          .trim();
+      // Accept `quantity_used` (backend field), `quantity`, or `amount`.
+      quantity =
+          (item['quantity_used'] ?? item['quantity'] ?? item['amount'] ?? '')
+              .toString()
+              .trim();
+    } else {
+      name = item.toString().trim();
+      quantity = '';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Bullet dot
+          Container(
+            width: 7,
+            height: 7,
+            margin: const EdgeInsets.only(left: 12),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF81C784),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          // Quantity pill badge — shown whenever the backend provides a value.
+          if (quantity.isNotEmpty)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF81C784).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: const Color(0xFF81C784).withOpacity(0.3)),
+              ),
+              child: Text(
+                quantity,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF81C784),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Missing items section (items needed from store) ───────────────────────────
+
+class _MissingItemsSection extends StatelessWidget {
+  const _MissingItemsSection({required this.items});
+  final dynamic items;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = items is List ? items as List : [];
+    if (list.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+        const _RecipeSectionHeader(
+          title: 'לרכישה',
+          icon: Icons.shopping_cart_outlined,
+          color: Color(0xFFFFB830),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: list.map((e) {
+            final label = e is Map
+                ? (e['item_name'] ?? e['name'] ?? e).toString()
+                : e.toString();
+            return Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFB830).withOpacity(0.09),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: const Color(0xFFFFB830).withOpacity(0.25)),
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFFFFB830),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Instructions section ──────────────────────────────────────────────────────
+
+class _InstructionsSection extends StatelessWidget {
+  const _InstructionsSection({required this.steps});
+  final dynamic steps;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = steps is List ? steps as List : [];
+    if (list.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _RecipeDivider(),
+        const _RecipeSectionHeader(
+          title: 'הוראות הכנה',
+          icon: Icons.menu_book_rounded,
+          color: Color(0xFFB06EF5),
+        ),
+        Column(
+          children: [
+            for (int i = 0; i < list.length; i++)
+              _StepRow(step: list[i], number: i + 1),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StepRow extends StatelessWidget {
+  const _StepRow({required this.step, required this.number});
+  final dynamic step;
+  final int number;
+
+  @override
+  Widget build(BuildContext context) {
+    // Support strings, or {step, instruction, description} maps.
+    final String text;
+    if (step is Map) {
+      text = (step['instruction'] ??
+              step['description'] ??
+              step['step'] ??
+              step['text'] ??
+              '')
+          .toString()
+          .trim();
+    } else {
+      text = step.toString().trim();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Step number badge
+          Container(
+            width: 28,
+            height: 28,
+            margin: const EdgeInsets.only(left: 12, top: 1),
+            decoration: BoxDecoration(
+              color: const Color(0xFFB06EF5).withOpacity(0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: const Color(0xFFB06EF5).withOpacity(0.35)),
+            ),
+            child: Center(
+              child: Text(
+                '$number',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB06EF5),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14.5,
+                color: Colors.white.withOpacity(0.88),
+                height: 1.65,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Notes / tips section ──────────────────────────────────────────────────────
+
+class _NotesSection extends StatelessWidget {
+  const _NotesSection({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const _RecipeDivider(),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.07)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.lightbulb_outline_rounded,
+                  size: 18,
+                  color: const Color(0xFFFFB830).withOpacity(0.7)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Colors.white.withOpacity(0.6),
+                    height: 1.6,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Raw fallback (when API returns unstructured text) ─────────────────────────
+
+class _RawRecipeFallback extends StatelessWidget {
+  const _RawRecipeFallback({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.07)),
+      ),
+      child: SelectableText(
+        text,
+        style: const TextStyle(
+          fontSize: 14.5,
+          color: Colors.white,
+          height: 1.7,
+          letterSpacing: 0.1,
         ),
       ),
     );

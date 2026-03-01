@@ -6,11 +6,12 @@ A Flutter mobile application for managing your fridge inventory, shopping list, 
 
 ## What's New
 
-### AI Recipes Screen
-A fully functional recipes screen (`recipes_screen.dart`) has been built and wired into the main dashboard. The screen communicates with a local Python FastAPI backend via three `POST` endpoints. Users describe a meal, choose a guest count, and receive an AI-generated recipe built from their current fridge inventory. They can iterate on the result through an inline revision chat, then confirm with a single tap — which triggers the backend to deduct used ingredients from `fridge_items` and sync any missing items into `smart_shopping_list`.
+### Recipe UI Refinement & Quantity Display
+- **Structured recipe layout** — The raw JSON response from the AI backend is now parsed into a dedicated, RTL (Right-to-Left) layout. The recipe card shows a friendly chef message banner, a bold recipe name with optional tagline and metadata (cooking time, difficulty, servings), and clear sections for ingredients, missing items (to buy), instructions, and notes. Section headers use bold typography and coloured accent bars for quick scanning.
+- **Quantity display integration** — Exact quantities are surfaced in two places: (1) **Recipe screen** — the Ingredients section renders each item with an optional quantity pill (from backend fields `quantity_used`, `quantity`, or `amount`); (2) **Smart Shopping List** — each row displays the item quantity from the Supabase `quantity` column via a small badge, so users see “how much” at a glance. Both UIs read dynamically from the backend; no hardcoded placeholders.
 
 ### Smart Shopping List
-A fully functional shopping list screen (`shopping_list_screen.dart`) has been built and wired into the main dashboard. Items are fetched from the `smart_shopping_list` Supabase table, filtered by `user_id`, and displayed grouped by category. The screen supports manual item entry via a FAB, a Google Keep-style check-off system with undo, and permanent deletion via a trash icon.
+A fully functional shopping list screen (`shopping_list_screen.dart`) has been built and wired into the main dashboard. Items are fetched from the `smart_shopping_list` Supabase table, filtered by `user_id`, and displayed grouped by category. Each row shows the item name and a quantity badge (from the `quantity` column). The screen supports manual item entry via a FAB, a Google Keep-style check-off system with undo, and permanent deletion via a trash icon.
 
 ### Multi-Tenant Infrastructure
 All database queries against `fridge_items` and `smart_shopping_list` are filtered by the authenticated `user_id`. Each user sees only their own data — enforced both at the query level in the service layer and at the database level via Supabase Row Level Security (RLS) policies.
@@ -68,6 +69,7 @@ Fixed a crash caused by Supabase Realtime timeout exceptions on slow or dropped 
 
 #### Smart Shopping List
 - **Category-grouped list** — Items fetched from Supabase and displayed in collapsible sections by category
+- **Quantity display** — Each list item shows its `quantity` from Supabase (e.g. `2`, `1.5`) in a small badge next to the name, so users see exact amounts without opening the item
 - **Keep-style check-off** — Tapping an item applies a strikethrough and updates its `status` to `"bought"` in the database; the item stays visible rather than disappearing immediately
 - **5-second Undo** — A floating `SnackBar` action lets the user reverse a check-off before it is committed, restoring the item to `"pending"` both locally and in the database
 - **Permanent delete** — A trash icon button triggers hard deletion from the database; separate from the check-off flow to prevent accidental data loss
@@ -76,12 +78,14 @@ Fixed a crash caused by Supabase Realtime timeout exceptions on slow or dropped 
 
 #### AI Recipes
 - **Prompt view** — Free-text meal description field plus an adjustable guest counter (1–20); the AI uses the user's live fridge inventory as context
-- **Recipe generation** — `POST /generate_recipe` with `{ user_id, prompt, guests }`; response is rendered in a selectable, scrollable card
+- **Recipe generation** — `POST /generate_recipe` with `{ user_id, prompt, guests }`; response is parsed and rendered in a structured layout
+- **Structured RTL recipe card** — Parsed JSON is displayed in a Right-to-Left layout: friendly chef message banner, bold recipe name and tagline, metadata (cooking time, difficulty, servings), and distinct sections for ingredients (with quantity pills), missing items to buy, numbered instructions, and notes
+- **Ingredients with quantities** — Each ingredient row shows the item name and, when provided by the backend, an exact quantity pill (from `quantity_used`, `quantity`, or `amount`), so users see precise amounts at a glance
 - **Inline revision** — A chat-style text field sends `POST /revise_recipe` with `{ user_id, feedback }`; the card is replaced in-place and scrolled back to the top
 - **Cook This! confirmation** — `POST /confirm_recipe` with `{ user_id }` triggers the backend to deduct used ingredients from `fridge_items` and add any missing items to `smart_shopping_list`
 - **Non-blocking loading overlay** — A semi-transparent spinner sits over the current view during in-flight requests; the recipe card remains visible while a revision is processing
 - **Robust error handling** — HTTP errors are parsed for `detail` / `message` fields; network exceptions are caught and surfaced verbatim in a `SnackBar`, never silently swallowed
-- **Flexible JSON parsing** — Response `recipe` field is handled as either a plain `String` or a structured `Map`/`List`, with automatic pretty-printing for structured payloads
+- **Flexible JSON parsing** — Response `recipe` field is handled as either a plain `String` or a structured `Map`; structured payloads drive the RTL sectioned layout (fallback to raw text when the shape is unexpected)
 - **Start Over** — Resets all local state without a network call, returning to the prompt view
 
 ### Coming Soon
@@ -168,6 +172,10 @@ The `RecipesScreen` manages a two-state UI (prompt view → recipe view) via `An
 - `_recipeToString` normalises the `recipe` value to a display string regardless of whether the backend returns a plain `String`, a `Map`, or a `List` — future-proofing the client against structured response changes.
 
 **Base URL note:** The API base is `http://127.0.0.1:8000`. On Android emulators, replace with `10.0.2.2:8000`; on a physical device, use the host machine's LAN IP.
+
+**Structured recipe JSON:** When the backend returns a `recipe` object (not a plain string), the client expects fields such as `chef_message`, `recipe_name`, `tagline`, `cooking_time`/`prep_time`, `difficulty`, `servings`, `used_fridge_items`, `missing_items`, `instructions`, and `notes`/`tips`. Ingredient entries can be strings or maps with `item_name`/`name`/`ingredient` and `quantity_used`/`quantity`/`amount`. The recipe content area is wrapped in `Directionality(textDirection: TextDirection.rtl)` for Hebrew-friendly layout; the bottom action bar (revise field, Cook This! button) remains LTR.
+
+**Quantity integration:** Recipe ingredients read quantities from the parsed JSON; the Shopping List reads `quantity` (numeric) from the `smart_shopping_list` Supabase table and displays it via a compact badge (whole numbers or one decimal). Both flows are dynamic — no client-side defaults for display when the backend omits a value.
 
 ---
 

@@ -813,6 +813,14 @@ class _ItemTile extends StatelessWidget {
             ),
           ),
 
+          // ── Quantity badge ──────────────────────────────────────────────
+          _QtyBadge(
+            quantity: item.quantity,
+            color: item.isBought
+                ? Colors.white.withOpacity(0.3)
+                : accentColor,
+          ),
+
           // ── Move-to-category icon ───────────────────────────────────────
           // Tapping opens a bottom sheet so the user can re-assign the item.
           // The PATCH fires immediately on selection.
@@ -1096,6 +1104,45 @@ class _AddItemDialogState extends State<_AddItemDialog> {
           borderRadius: BorderRadius.circular(12),
           borderSide:
               const BorderSide(color: Color(0xFFFF4C4C), width: 1.5)),
+    );
+  }
+}
+
+// ── Quantity badge ────────────────────────────────────────────────────────────
+
+/// Small pill that displays the item quantity.
+/// Renders as an integer when the value is a whole number (e.g. `2.0` → `"2"`),
+/// and with one decimal place otherwise (e.g. `1.5` → `"1.5"`).
+/// Always visible so the user can tell at a glance how much to buy.
+class _QtyBadge extends StatelessWidget {
+  const _QtyBadge({required this.quantity, required this.color});
+
+  final double quantity;
+  final Color color;
+
+  String get _label {
+    final isWhole = quantity == quantity.truncateToDouble();
+    return isWhole ? quantity.toInt().toString() : quantity.toStringAsFixed(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.28)),
+      ),
+      child: Text(
+        _label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color.withOpacity(0.85),
+        ),
+      ),
     );
   }
 }
